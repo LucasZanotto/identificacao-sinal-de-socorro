@@ -1,0 +1,14 @@
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+
+# Imagens de pessoas e o que é gerado a partir delas não vão para o repositório
+dataset/
+resultados/
+alertas.csv
+testes/dados/
+
+# O texto do TCC não vai para o repositório
+entrega/
+*.docx

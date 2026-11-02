@@ -107,16 +107,21 @@ Cada quadro passa pelas etapas abaixo e depois é descartado.
 
 ```mermaid
 flowchart TD
-    A["Quadro da câmera"] --> B["Correção de luz"]
-    B -- "procura mãos novas" --> C["Detecção de movimento:<br>onde procurar"]
-    B -- "mão já encontrada" --> D["Recorte que segue a mão"]
-    C --> E["MediaPipe, modo imagem:<br>detector de palma e 21 pontos"]
-    D --> F["MediaPipe, modo de vídeo:<br>só os 21 pontos"]
-    E -- "abre um recorte" --> D
-    E --> G["Geometria:<br>duas medidas e a pose"]
-    F --> G
-    G --> H["Máquina de estados:<br>ordem do gesto"]
-    H -- "sequência completa" --> I["Alerta"]
+    subgraph V["Onde olhar e extrair os pontos"]
+        direction LR
+        A["Quadro da câmera"] --> B["Correção de luz"]
+        B -- "procura mãos novas" --> C["Detecção de movimento"]
+        C --> E["MediaPipe, modo imagem:<br>palma e 21 pontos"]
+        B -- "mão já encontrada" --> D["Recorte que segue a mão"]
+        D --> F["MediaPipe, modo de vídeo:<br>só os 21 pontos"]
+        E -- "abre um recorte" --> D
+    end
+    subgraph P["Decidir se é o gesto"]
+        direction LR
+        G["Geometria:<br>duas medidas e a pose"] --> H["Máquina de estados:<br>ordem do gesto"]
+        H -- "sequência completa" --> I["Alerta"]
+    end
+    V -- "21 pontos de cada mão" --> P
 ```
 
 **1. Correção de luz.** Se o brilho médio do quadro fica abaixo de 90, em uma escala de 0 a 255, a imagem é clareada com correção gama. Quadro claro passa direto.

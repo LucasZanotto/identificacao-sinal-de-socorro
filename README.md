@@ -81,6 +81,7 @@ Teclas: `q` sai, `p` pausa e `m` mostra ou esconde a imagem do movimento.
 
 Com celular e câmera IP, o sistema lê a imagem em paralelo e usa sempre o quadro mais recente, então o vídeo não acumula
 atraso, e tenta conectar de novo se a conexão cair. `--sem-janela` e `--sem-som` desligam a tela e o som.
+`--localizador inteiro` e `--localizador yolo` trocam a detecção de movimento por outra forma de procurar a mão, só para comparar.
 
 ### Ver funcionando sem câmera
 
@@ -105,14 +106,17 @@ python detecao_socorro.py --fonte testes/dados/signal_for_help_wikimedia.ogg
 Cada quadro passa pelas etapas abaixo e depois é descartado.
 
 ```mermaid
-flowchart LR
-    A["Câmera"] --> B["Correção de luz"]
-    B --> C["Detecção de movimento:<br>onde procurar"]
-    C --> D["MediaPipe:<br>21 pontos da mão"]
-    D --> E["Geometria:<br>qual é a pose"]
-    E --> F["Máquina de estados:<br>ordem do gesto"]
-    F --> G["Alerta"]
-    D -- o recorte segue a mão --> D
+flowchart TD
+    A["Quadro da câmera"] --> B["Correção de luz"]
+    B -- "procura mãos novas" --> C["Detecção de movimento:<br>onde procurar"]
+    B -- "mão já encontrada" --> D["Recorte que segue a mão"]
+    C --> E["MediaPipe, modo imagem:<br>detector de palma e 21 pontos"]
+    D --> F["MediaPipe, modo de vídeo:<br>só os 21 pontos"]
+    E -- "abre um recorte" --> D
+    E --> G["Geometria:<br>duas medidas e a pose"]
+    F --> G
+    G --> H["Máquina de estados:<br>ordem do gesto"]
+    H -- "sequência completa" --> I["Alerta"]
 ```
 
 **1. Correção de luz.** Se o brilho médio do quadro fica abaixo de 90, em uma escala de 0 a 255, a imagem é clareada com correção gama. Quadro claro passa direto.
@@ -136,7 +140,6 @@ Com isso cada quadro recebe uma pose: **aberta** (quatro dedos esticados e poleg
 
 ```mermaid
 stateDiagram-v2
-    direction LR
     state "0 Repouso" as repouso
     state "1 Mão aberta" as aberta
     state "2 Polegar recolhido" as polegar

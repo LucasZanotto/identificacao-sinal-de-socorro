@@ -6,7 +6,7 @@ o gesto criado pela Canadian Women's Foundation para pedir ajuda sem falar nada.
 
 Roda só na CPU, sem placa de vídeo e sem internet. Nenhuma imagem é gravada durante o monitoramento.
 
-TCC de Arthur Romanatto Moro e Lucas Abati Zanotto, com orientação de Herculano Haymussi De Biasi (Unoesc Videira, 2026).
+TCC de Arthur Romanatto Moro e Lucas Abati Zanotto, com orientação de Herculano Haymussi De Biasi (Unoesc, 2026).
 
 | Durante o gesto | Gesto reconhecido |
 |---|---|

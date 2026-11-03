@@ -1,4 +1,5 @@
 import os
+import runpy
 import sys
 import time
 
@@ -12,11 +13,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import detecao_socorro
 from alerta import Alerta
 from gesto import Configuracao, RastreadorMaos
-from painel import ALTURA, ESPERANDO, LARGURA_LATERAL, Painel
+from painel import ALTURA, CINZA, ESPERANDO, LARANJA, LARGURA_LATERAL, Painel, VERDE
 from pipeline import Quadro, Regiao
 import mao_sintetica as ms
 
 MEDIDAS = {"fps": 25.0, "ms_total": 38.0, "ms_localizar": 1.5, "ms_mediapipe": 30.0, "ms_gesto": 0.05}
+REGIOES = [Regiao((100, 100, 500, 500), "mao"), Regiao((600, 100, 900, 400), "movimento"), Regiao((0, 0, 1280, 720), "inteiro")]
 
 
 def frame(largura=1280, altura=720):
@@ -44,13 +46,35 @@ def test_tela_com_cada_pose(tmp_path, pontos):
     rastreador, painel, alerta = montar(tmp_path)
     for i in range(3):
         rastreador.atualizar([(pontos(), "Left")], i * 0.1)
-    regioes = [Regiao((100, 100, 500, 500), "mao"), Regiao((600, 100, 900, 400), "movimento"), Regiao((0, 0, 1280, 720), "inteiro")]
     mascara = np.zeros((180, 320), dtype=np.uint8)
     antes = frame()
-    tela = desenhar(painel, rastreador, alerta, tela=antes, tempo=0.3, mascara=mascara, regioes=regioes, clareado=True)
+    tela = desenhar(painel, rastreador, alerta, tela=antes, tempo=0.3, mascara=mascara, regioes=REGIOES, clareado=True)
     assert tela.shape[0] == ALTURA
     # O vídeo original continua limpo: só a cópia recebe os desenhos
     assert (antes == 180).all()
+
+
+def tem_laranja(img):
+    # A tolerância pega também a borda suavizada do texto
+    return bool((np.abs(img.astype(int) - LARANJA).sum(axis=2) < 60).any())
+
+
+def test_versao_limpa_mostra_so_o_quadrado_da_mao(tmp_path):
+    rastreador, painel, alerta = montar(tmp_path)
+    tela = desenhar(painel, rastreador, alerta, regioes=REGIOES)
+    assert (tela[300, 100] == VERDE).all()
+    assert (tela[300, 600] == 180).all()
+    assert (tela[300, 0] == 180).all()
+    assert not tem_laranja(tela)
+
+
+def test_versao_profunda_mostra_tudo_o_que_o_sistema_examina(tmp_path):
+    rastreador, _, alerta = montar(tmp_path)
+    tela = desenhar(Painel(rastreador.cfg, profundo=True), rastreador, alerta, regioes=REGIOES)
+    assert (tela[300, 100] == VERDE).all()
+    assert (tela[300, 600] == LARANJA).all()
+    assert (tela[300, 0] == CINZA).all()
+    assert tem_laranja(tela[:, 1280:])
 
 
 @pytest.mark.parametrize("largura, altura", [(405, 720), (1080, 1920), (1920, 1080), (640, 480)])
@@ -196,6 +220,21 @@ def test_programa_completo_em_um_arquivo_com_a_tela(tmp_path, monkeypatch):
     detecao_socorro.main()
     assert len(mostradas) == 20
     assert mostradas[0] == (ALTURA, 960 + LARGURA_LATERAL, 3)
+
+
+def test_programa_profundo_abre_a_mesma_tela_na_janela_dele(tmp_path, monkeypatch):
+    video = str(tmp_path / "video.mp4")
+    criar_video(video)
+    janelas = set()
+    monkeypatch.setattr(cv2, "namedWindow", lambda *a: None)
+    monkeypatch.setattr(cv2, "imshow", lambda nome, _: janelas.add(nome))
+    monkeypatch.setattr(cv2, "waitKey", lambda _: -1)
+    monkeypatch.setattr(cv2, "destroyAllWindows", lambda: None)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["detecao", "--fonte", video, "--sem-som"])
+    programa = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "detecao_socorro_profundo.py")
+    runpy.run_path(programa, run_name="__main__")
+    assert janelas == {detecao_socorro.JANELA_PROFUNDA}
 
 
 def test_q_encerra_o_programa(tmp_path, monkeypatch):

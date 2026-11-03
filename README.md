@@ -33,8 +33,8 @@ Você vai precisar de:
 Baixe o projeto e crie um ambiente só para ele:
 
 ```bash
-git clone https://github.com/LucasZanotto/projeto-tcc.git
-cd projeto-tcc
+git clone https://github.com/LucasZanotto/identificacao-sinal-de-socorro.git
+cd identificacao-sinal-de-socorro
 python -m venv .venv
 ```
 
@@ -65,10 +65,18 @@ O modelo do MediaPipe (`hand_landmarker.task`) já vem no repositório. O sistem
 python detecao_socorro.py
 ```
 
-Isso abre a câmera padrão e uma janela com o vídeo e o painel. Faça o gesto olhando o painel. Quando ele é reconhecido,
+Isso abre a câmera padrão e uma janela com o vídeo e o painel. Sobre o vídeo aparece só a mão, com o quadrado verde. Faça o gesto olhando o painel. Quando ele é reconhecido,
 aparece uma faixa vermelha, toca um som e fica um registro em `alertas.csv`, com a data, a hora e a posição da mão.
 
 Teclas: `q` sai, `p` pausa e `m` mostra ou esconde a imagem do movimento.
+
+### Ver tudo o que o sistema examina
+
+```bash
+python detecao_socorro_profundo.py
+```
+
+É o mesmo programa, com as mesmas opções e o mesmo resultado. A diferença é o que aparece na tela: ele desenha também os quadrados laranja das regiões que se mexeram e o quadro inteiro quando ele é examinado, e lista essas regiões no painel. Serve para entender por que uma mão foi ou não encontrada.
 
 ### Outras fontes de vídeo
 
@@ -94,10 +102,10 @@ python detecao_socorro.py --fonte testes/dados/signal_for_help_wikimedia.ogg
 
 ### O que o painel mostra
 
-- **No vídeo:** o recorte onde o sistema está olhando e os pontos da mão. Dedo verde está esticado, vermelho está dobrado e amarelo está em dúvida. O polegar fica azul quando está recolhido.
+- **No vídeo:** o quadrado verde da mão acompanhada e os pontos da mão. Dedo verde está esticado, vermelho está dobrado e amarelo está em dúvida. O polegar fica azul quando está recolhido.
 - **Sequência do gesto:** em que etapa está, o que ele espera agora e quanto tempo falta para desistir.
 - **Leitura da mão:** a medida de cada dedo e do polegar, com os limites que decidem a pose, e a pose que ele entendeu.
-- **Onde está olhando:** de onde veio o recorte, com a imagem do que se mexeu.
+- **Onde está olhando:** se há mão acompanhada, com a imagem do que se mexeu. A versão profunda lista também as regiões em movimento.
 - **Últimos eventos:** cada mudança de etapa, com o motivo quando a sequência volta ao início. O terminal mostra o mesmo.
 - **Desempenho:** FPS e o tempo de cada parte.
 
@@ -174,13 +182,13 @@ O trabalho não treina nenhuma rede neural, e a decisão do gesto é só geometr
 
 ## Gravar os vídeos de teste
 
-Cada pessoa grava 62 clipes de 6 segundos (33 com o sinal e 29 de controle), em cerca de 12 minutos. O programa diz o que fazer em cada clipe e já salva com o nome certo.
+Cada sessão grava 62 clipes de 6 segundos (33 com o sinal e 29 de controle), em cerca de 12 minutos. O programa diz o que fazer em cada clipe e já salva com o nome certo.
 
 ```bash
 python gravar_dataset.py --pessoa P01 --fitzpatrick III --dataset C:\tcc\dataset
 ```
 
-- `--pessoa` é um código, nunca o nome. Neste trabalho, P01 e P02 são os autores.
+- `--pessoa` é um código, nunca o nome. Neste trabalho, P01 é a primeira sessão do participante e P01_s2 é a segunda. O sufixo `_s2` faz o relatório entender que é a mesma pessoa.
 - `--fitzpatrick` é o tom de pele na escala de Fitzpatrick (I a VI). É obrigatório no comando e só serve para agrupar o relatório.
 - Com o celular como câmera, acrescente `--fonte http://IP_DO_CELULAR:4747/video`.
 - Grave fora de pastas sincronizadas, como OneDrive e Google Drive, para os vídeos não subirem para a nuvem.
@@ -229,6 +237,7 @@ Os testes da lógica usam uma mão sintética e não precisam de câmera. `test_
 | Arquivo | O que faz |
 |---|---|
 | `detecao_socorro.py` | Programa principal: lê o vídeo e liga todas as partes |
+| `detecao_socorro_profundo.py` | O mesmo programa, mostrando também as regiões que se mexeram |
 | `pipeline.py` | Correção de luz, detecção de movimento, MediaPipe e os recortes que seguem cada mão |
 | `gesto.py` | Medidas geométricas, poses e máquina de estados. Não depende de câmera nem de modelo |
 | `painel.py` | A tela que mostra o que o sistema está pensando |
@@ -239,55 +248,70 @@ Os testes da lógica usam uma mão sintética e não precisam de câmera. `test_
 | `hand_landmarker.task` | Modelo pronto do MediaPipe |
 | `yolov8n.pt` | Modelo pronto do YOLOv8n, só para a comparação de gasto |
 
-## Resultados até agora
+## Resultados
 
-> **Prévia com uma pessoa só**, a mesma cujos clipes serviram para escolher os limites. Mostra o comportamento do sistema, mas não é a medição final. A medição final usa os clipes da segunda pessoa, que ficam fora da calibração, e ainda não foi feita.
+> **Medição final com uma pessoa só**, um dos autores, que conhece o gesto. Os 58 clipes da primeira sessão serviram só para calibrar. Os 62 clipes da segunda sessão, gravados depois de o código e os limites estarem fechados, formam o teste. Os resultados não valem para outras pessoas nem para outros tons de pele.
 
-São 62 clipes reais, em 10 cenários. O sistema reconheceu **32 de 33 sinais** e disparou em **3 de 29 clipes de controle**, com acurácia de 93,5% (intervalo de confiança de 95%: 84,6 a 97,5).
+O sistema reconheceu **33 de 33 sinais** e disparou em **1 de 29 clipes de controle**:
 
-Assistindo aos quadros, os quatro erros vieram da gravação: em três clipes de controle o sinal foi feito de verdade, e em um clipe de sinal a mão já começa fechada. Os números continuam contando esses clipes, porque o certo é regravá-los, não trocar o rótulo depois de ver o resultado.
+| Métrica | Valor | Intervalo de confiança de 95% |
+|---|---|---|
+| Acurácia | 98,4% | 91,4 a 99,7 |
+| Precisão | 97,1% | 85,1 a 99,5 |
+| Sensibilidade | 100,0% | 89,6 a 100,0 |
+| Especificidade | 96,6% | 82,8 a 99,4 |
+| F1-Score | 98,5% | 94,6 a 100,0 |
 
-Mão virada, costas da mão, manga de longe, câmera alta, longe, oclusão e movimento brusco tiveram 3 de 3 sinais cada um.
+Todos os cenários tiveram todos os sinais reconhecidos, inclusive pouca luz, mão virada, costas da mão, manga de longe, câmera alta, longe, oclusão e movimento brusco. Cada cenário tem de 5 a 9 clipes, então isso mostra onde o sistema funciona, mas não é uma taxa precisa.
+
+O único alarme falso foi em um clipe com pouca luz, em que a mão fecha com o polegar encostado no indicador. Assistindo ao clipe, o polegar fica por fora do punho, então o erro é do sistema: o polegar encostou na palma antes de os dedos fecharem e foi lido como recolhido.
 
 **Comparação com regras mais simples, nos mesmos clipes:**
 
 | Regra de decisão | Acurácia | Sensibilidade | Especificidade | McNemar p |
 |---|---|---|---|---|
-| Sistema proposto | 93,5% | 97,0% | 89,7% | referência |
-| Protótipo anterior | 80,6% | 90,9% | 69,0% | 0,0078 |
-| Abre e fecha, sem olhar o polegar | 71,0% | 97,0% | 41,4% | 0,0001 |
-| Só punho, sem sequência | 64,5% | 100,0% | 24,1% | menor que 0,0001 |
+| Sistema proposto | 98,4% | 100,0% | 96,6% | referência |
+| Protótipo anterior | 91,9% | 100,0% | 82,8% | 0,1250 |
+| Abre e fecha, sem olhar o polegar | 74,2% | 100,0% | 44,8% | 0,0001 |
+| Só punho, sem sequência | 62,9% | 100,0% | 20,7% | menor que 0,0001 |
 
-**Rastreamento:** acompanhar a mão com o modo de vídeo levou a sensibilidade de 78,8% para 97,0% (McNemar p = 0,0312). Com a mão virada, foi de 1 para 3 sinais em 3.
+**Onde o MediaPipe olha:** detecção de movimento e YOLO deram o mesmo resultado em todos os clipes. No quadro inteiro, a sensibilidade caiu para 87,9%, com 1 de 3 sinais de longe.
+
+**Rastreamento:** sem ele, a sensibilidade caiu para 84,8%, com 1 de 3 sinais na mão virada, e o alarme falso não aparece. Cinco clipes só deram certo com o rastreamento e um só deu certo sem ele (McNemar p = 0,2188).
+
+**Correção de luz:** os sinais foram reconhecidos com e sem ela, e o único alarme falso só acontece com ela ligada. Um clipe não prova que ela atrapalha, mas este teste também não mostrou ganho.
 
 **Gasto**, sem placa de vídeo, em um Ryzen 5 4600G com 16 GB, com o vídeo chegando a 15 quadros por segundo. A CPU é o percentual do processador inteiro:
 
 | Configuração | Tempo por quadro | FPS máximo | CPU | Memória |
 |---|---|---|---|---|
-| **Movimento + MediaPipe (o sistema)** | **18,4 ms** | **54,2** | **3,3%** | **307 MB** |
-| O mesmo, sem o rastreamento | 29,4 ms | 34,0 | 4,5% | 302 MB |
-| YOLO a cada 3 quadros + MediaPipe | 34,5 ms | 29,0 | 8,3% | 641 MB |
-| YOLO em todo quadro + MediaPipe | 73,0 ms | 13,7 | 19,6% | 635 MB |
+| **Movimento + MediaPipe (o sistema)** | **24,7 ms** | **40,5** | **4,2%** | **313 MB** |
+| O mesmo, sem o rastreamento | 31,9 ms | 31,4 | 5,1% | 304 MB |
+| MediaPipe no quadro inteiro | 18,1 ms | 55,4 | 3,7% | 303 MB |
+| YOLO a cada 3 quadros + MediaPipe | 41,6 ms | 24,0 | 9,8% | 641 MB |
+| YOLO em todo quadro + MediaPipe | 88,4 ms | 11,3 | 19,7% | 636 MB |
 
-Medidas geométricas e máquina de estados levam 0,054 ms por quadro. Nos clipes de tamanho normal, movimento, quadro inteiro e YOLO dão o mesmo resultado em todos os cenários.
+Medidas geométricas e máquina de estados levam 0,042 ms por quadro.
 
-**Distância simulada**, encolhendo a imagem dos mesmos clipes (conta os clipes gravados errado). É aqui que a detecção de movimento faz diferença:
+**Distância simulada**, encolhendo a imagem dos mesmos clipes em cinco escalas, por isso os totais são maiores que o número de clipes. A palma mede cerca de 57 pixels a 1,5 m e cerca de 32 pixels a 3 ou 4 m. É aqui que a detecção de movimento faz diferença:
 
 | Tamanho da palma | Sinais, com movimento | Alarmes, com movimento | Sinais, quadro inteiro | Alarmes, quadro inteiro |
 |---|---|---|---|---|
-| 60 pixels ou mais | 23 de 26 | 1 de 20 | 23 de 26 | 1 de 20 |
-| 40 a 60 | 30 de 31 | 3 de 22 | 30 de 31 | 3 de 22 |
-| 30 a 40 | 24 de 25 | 3 de 26 | 21 de 25 | 3 de 26 |
-| 20 a 30 | 33 de 34 | 3 de 32 | 18 de 34 | 2 de 32 |
-| 15 a 20 | 24 de 25 | 3 de 23 | 1 de 25 | 0 de 23 |
-| 10 a 15 | 14 de 16 | 1 de 14 | 0 de 16 | 0 de 14 |
-| menos de 10 | 5 de 8 | 0 de 8 | 0 de 8 | 0 de 8 |
+| 60 pixels ou mais | 10 de 10 | 0 de 2 | 10 de 10 | 0 de 2 |
+| 40 a 60 | 37 de 37 | 1 de 27 | 36 de 37 | 1 de 27 |
+| 30 a 40 | 21 de 21 | 0 de 15 | 18 de 21 | 1 de 15 |
+| 20 a 30 | 37 de 38 | 0 de 36 | 16 de 38 | 0 de 36 |
+| 15 a 20 | 24 de 28 | 0 de 19 | 4 de 28 | 0 de 19 |
+| 10 a 15 | 15 de 25 | 0 de 32 | 0 de 25 | 0 de 32 |
+| menos de 10 | 1 de 6 | 1 de 14 | 0 de 6 | 0 de 14 |
 
 ## Limitações
 
-- **Poucas pessoas.** Os testes usam só os dois autores, que já conhecem o gesto. Os resultados não valem para outras pessoas nem para outros tons de pele.
-- **Pouca luz ainda não foi medida.** Os clipes do cenário de pouca luz ficaram claros demais, com brilho parecido com o dos clipes de luz boa.
+- **Uma pessoa só.** Os testes usam um dos autores, que conhece o gesto e acompanhou o desenvolvimento, em duas sessões no mesmo dia. Os resultados não valem para outras pessoas nem para outros tons de pele.
+- **Poucos clipes por cenário.** O cenário de oclusão, por exemplo, deu 100% de acurácia, mas o intervalo de confiança vai de 56,6 a 100.
+- **Polegar encostado na palma:** uma mão que encosta o polegar na palma antes de fechar pode ser confundida com o sinal, porque no punho o polegar não é conferido.
 - **Câmera real ainda não foi testada.** A câmera dos testes foi um celular com DroidCam, em um computador mais potente do que um dispositivo embarcado.
+- **Clipes curtos:** a medição não diz quantos alarmes falsos apareceriam em horas de monitoramento.
 - **Costas da mão:** o polegar fica escondido e o modelo só estima a posição dele.
 - **Mão totalmente de lado:** os dedos se escondem uns atrás dos outros, então o gesto tende a falhar.
 - **Câmera fixa:** a detecção de movimento pressupõe que a câmera não se mexe.

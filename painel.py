@@ -67,12 +67,17 @@ def medidor(img, x, y, largura, valor, minimo, maximo, marcas, cor):
 
 
 class Painel:
-    def __init__(self, cfg, tempo_inicial=0.0):
+    def __init__(self, cfg, tempo_inicial=0.0, profundo=False):
         self.cfg = cfg
         self.tempo_inicial = tempo_inicial
+        self.profundo = profundo
         self.eventos = deque(maxlen=6)
         self.estados = {}
         self.mostrar_mascara = True
+
+    def _regioes_visiveis(self, quadro):
+        """A versão limpa mostra só as mãos. A profunda mostra também o movimento e o quadro inteiro."""
+        return quadro.regioes if self.profundo else [regiao for regiao in quadro.regioes if regiao.origem == "mao"]
 
     def _anotar(self, tempo, conteudo):
         linha = f"{tempo - self.tempo_inicial:6.1f}s  {conteudo}"
@@ -111,7 +116,7 @@ class Painel:
     def _desenhar_video(self, frame, quadro, rastreador):
         fator = frame.shape[0] / ALTURA
         grossura = max(1, round(1.5 * fator))
-        for regiao in quadro.regioes:
+        for regiao in self._regioes_visiveis(quadro):
             x1, y1, x2, y2 = regiao.caixa
             cor = CORES_ORIGEM[regiao.origem]
             cv2.rectangle(frame, (x1, y1), (x2, y2), cor, grossura)
@@ -220,10 +225,11 @@ class Painel:
         titulo(img, "ONDE ESTA OLHANDO", y)
         topo = y + 14
         y += 26
-        if not quadro.regioes:
-            texto(img, "Nada se mexeu, so esperando", MARGEM, y, CINZA, 0.42)
+        regioes = self._regioes_visiveis(quadro)
+        if not regioes:
+            texto(img, "Nada se mexeu, so esperando" if self.profundo else "Nenhuma mao acompanhada", MARGEM, y, CINZA, 0.42)
             y += 18
-        for regiao in quadro.regioes:
+        for regiao in regioes:
             texto(img, NOMES_ORIGEM[regiao.origem], MARGEM, y, CORES_ORIGEM[regiao.origem], 0.42)
             y += 18
         if quadro.clareado:

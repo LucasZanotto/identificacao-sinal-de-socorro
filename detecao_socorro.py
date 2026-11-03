@@ -10,7 +10,8 @@ from gesto import RastreadorMaos
 from painel import Painel
 from pipeline import DetectorMaos
 
-JANELA = "Sistema de Monitoramento (Movimento + MediaPipe)"
+JANELA = "Sistema de Monitoramento"
+JANELA_PROFUNDA = "Sistema de Monitoramento (visao profunda)"
 FALHAS_PARA_RECONECTAR = 60
 ESPERA_RECONEXAO = 2.0  # Segundos
 
@@ -103,7 +104,8 @@ class CameraAoVivo:
         self.cap.release()
 
 
-def main():
+def main(profundo=False):
+    """profundo=True também mostra o que o sistema examina além das mãos (ver detecao_socorro_profundo.py)."""
     args = ler_argumentos()
     webcam = args.fonte.isdigit()
     ao_vivo = webcam or "://" in args.fonte
@@ -117,19 +119,20 @@ def main():
     print("Carregando modelos...")
     detector = DetectorMaos(localizador=None if args.localizador == "inteiro" else args.localizador)
     try:
-        monitorar(args, fonte, detector, webcam, ao_vivo)
+        monitorar(args, fonte, detector, webcam, ao_vivo, profundo)
     finally:
         fonte.liberar()
         detector.fechar()
         cv2.destroyAllWindows()
 
 
-def monitorar(args, fonte, detector, webcam, ao_vivo):
+def monitorar(args, fonte, detector, webcam, ao_vivo, profundo):
     rastreador = RastreadorMaos()
     alerta = Alerta(com_som=not args.sem_som)
-    painel = Painel(rastreador.cfg, time.monotonic() if ao_vivo else 0.0)
+    painel = Painel(rastreador.cfg, time.monotonic() if ao_vivo else 0.0, profundo)
+    janela = JANELA_PROFUNDA if profundo else JANELA
     if not args.sem_janela:
-        cv2.namedWindow(JANELA, cv2.WINDOW_NORMAL)
+        cv2.namedWindow(janela, cv2.WINDOW_NORMAL)
     print("Iniciando monitoramento. Pressione 'q' na janela para sair.")
 
     indice = 0
@@ -166,7 +169,7 @@ def monitorar(args, fonte, detector, webcam, ao_vivo):
 
         mascara = detector.movimento.mascara if detector.movimento is not None else None
         medidas = {"fps": fps, "ms_total": ms_total, "ms_localizar": quadro.ms_localizar, "ms_mediapipe": quadro.ms_mediapipe, "ms_gesto": ms_gesto}
-        cv2.imshow(JANELA, painel.desenhar(frame, quadro, rastreador, alerta, mascara, medidas, tempo))
+        cv2.imshow(janela, painel.desenhar(frame, quadro, rastreador, alerta, mascara, medidas, tempo))
 
         # Em arquivo espera o tempo do vídeo, para dar para acompanhar a tela
         restante = 1000 / fonte.fps - (time.perf_counter() - inicio) * 1000 if not ao_vivo else 1

@@ -67,7 +67,11 @@ def registrar_pessoa(dataset, pessoa, fitzpatrick):
         escritor.writerows(sorted(pessoas.items()))
 
 
-def medir_fps(cap, quadros=20):
+def medir_fps(cap, quadros=60, aquecimento=30):
+    # Os primeiros quadros chegam devagar enquanto a câmera ajusta a imagem. Medir neles gravava o
+    # arquivo com uma taxa menor que a real, e o clipe de 6 s ficava com 7 a 11 s
+    for _ in range(aquecimento):
+        cap.read()
     inicio = time.perf_counter()
     for _ in range(quadros):
         cap.read()

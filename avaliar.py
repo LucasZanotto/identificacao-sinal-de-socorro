@@ -31,6 +31,8 @@ from gesto import (
 ACAO_POSITIVA = "socorro"
 EXTENSOES = (".mp4", ".avi", ".mov", ".mkv", ".ogg", ".webm", ".m4v", ".3gp")
 FPS_ANALISE = 15  # Taxa com que os clipes são analisados, próxima do que uma CPU simples entrega
+DURACAO_GRAVADA = 6.0  # Segundos de relógio de cada clipe do gravar_dataset.py
+TAXAS_DE_CAMERA = (15, 23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60)
 META = 0.80
 MODOS = {
     "movimento": {"localizador": "movimento"},
@@ -40,8 +42,9 @@ MODOS = {
     "yolo": {"localizador": "yolo"},  # Só para comparar com o sistema
 }
 CENARIOS_DE_LUZ = ("baixa", "contraluz")
-# Mude quando o pipeline.py mudar, senão a avaliação reaproveita pontos extraídos pela versão anterior
-VERSAO_PONTOS = "v3"
+# Mude quando o pipeline.py mudar, senão a avaliação reaproveita pontos extraídos pela versão anterior.
+# A v4 passou a usar o tempo real da gravação (fps_do_video)
+VERSAO_PONTOS = "v4"
 NOME_PADRAO ="Movimento + MediaPipe (padrão)"
 NOME_YOLO = "YOLO a cada 3 quadros + MediaPipe"
 NOME_YOLO_TODOS = "YOLO em todo quadro + MediaPipe"
@@ -252,6 +255,26 @@ def pontos_em_dia(pasta, modo, clipe):
     return not os.path.exists(clipe.caminho) or os.path.getmtime(destino) >= os.path.getmtime(clipe.caminho)
 
 
+def fps_do_video(cap):
+    """Taxa de quadros que corresponde ao tempo real da gravação.
+
+    Até 07/11/2026 o gravar_dataset.py media a câmera nos primeiros quadros, quando ela ainda está
+    ajustando a imagem, e gravava o arquivo com uma taxa menor que a real. O clipe de 6 s de relógio
+    ficava com 7 a 11 s no arquivo, e o gesto parecia mais lento. Nesses clipes a taxa certa é o número
+    de quadros dividido pelos 6 s. Vídeos com uma taxa padrão de câmera, como os do celular, ficam como estão.
+    """
+    import cv2
+
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    quadros = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+    if not quadros or any(abs(fps - taxa) < 0.05 for taxa in TAXAS_DE_CAMERA):
+        return fps
+    real = quadros / DURACAO_GRAVADA
+    if quadros / fps > 1.05 * DURACAO_GRAVADA and 10 <= real <= 61:
+        return real
+    return fps
+
+
 def extrair_landmarks(clipes, pasta, modo):
     """Passa cada vídeo pelo YOLO e pelo MediaPipe e guarda só os pontos, nunca a imagem."""
     pendentes = [c for c in clipes if not pontos_em_dia(pasta, modo, c)]
@@ -265,7 +288,7 @@ def extrair_landmarks(clipes, pasta, modo):
         print(f"[{modo}] {i}/{len(pendentes)} {clipe.id}", flush=True)
         detector.reiniciar()
         cap = cv2.VideoCapture(clipe.caminho)
-        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+        fps = fps_do_video(cap)
         # Só os quadros que uma CPU simples daria conta, porque o recorte depende do quadro anterior
         passo = max(1, round(fps / FPS_ANALISE))
         quadros = []
@@ -368,7 +391,7 @@ def simular_distancia(clipes, dados, cfg):
                 detector.reiniciar()
                 rastreador = RastreadorMaos(cfg)
                 cap = cv2.VideoCapture(clipe.caminho)
-                fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+                fps = fps_do_video(cap)
                 passo = max(1, round(fps / FPS_ANALISE))
                 alerta = False
                 indice = 0
@@ -441,7 +464,7 @@ def medir_configuracao(parametros):
     inicio_medida = time.perf_counter()
     for caminho in parametros["videos"]:
         cap = cv2.VideoCapture(caminho)
-        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+        fps = fps_do_video(cap)
         passo = max(1, round(fps / FPS_ANALISE))
         detector.reiniciar()
         indice = 0

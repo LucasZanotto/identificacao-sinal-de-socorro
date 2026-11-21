@@ -117,6 +117,27 @@ def test_encolher_mantem_o_tamanho_do_quadro():
     assert abs((xs.max() + xs.min()) / 2 - 640) < 5
 
 
+@pytest.mark.parametrize("fps_arquivo, quadros, esperado", [
+    (16.237, 181, 181 / 6),  # Clipe do gravador antigo, com a câmera medida enquanto acordava
+    (26.347, 180, 30.0),
+    (30.0, 180, 30.0),  # Clipe gravado certo
+    (30.0, 600, 30.0),  # Vídeo comprido de celular, com taxa padrão
+    (29.97, 300, 29.97),
+])
+def test_fps_do_video_usa_o_tempo_real_da_gravacao(tmp_path, fps_arquivo, quadros, esperado):
+    import cv2
+    import numpy as np
+
+    caminho = str(tmp_path / "clipe.mp4")
+    escritor = cv2.VideoWriter(caminho, cv2.VideoWriter_fourcc(*"mp4v"), fps_arquivo, (64, 48))
+    for _ in range(quadros):
+        escritor.write(np.zeros((48, 64, 3), dtype=np.uint8))
+    escritor.release()
+    cap = cv2.VideoCapture(caminho)
+    assert avaliar.fps_do_video(cap) == pytest.approx(esperado, abs=0.05)
+    cap.release()
+
+
 def test_faixa_da_palma():
     assert avaliar.faixa_palma(80) == "60 ou mais"
     assert avaliar.faixa_palma(34) == "30 a 40"
